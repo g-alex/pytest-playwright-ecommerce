@@ -1,0 +1,8 @@
+pytest>=8.0
+pytest-playwright>=0.5
+playwright>=1.40
+httpx>=0.27
+python-dotenv>=1.0
+jsonschema>=4.20
+allure-pytest>=2.13
+pytest-html>=4.1
