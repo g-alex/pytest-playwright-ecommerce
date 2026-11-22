@@ -1,4 +1,5 @@
 # pytest-playwright-ecommerce
+[![CI](https://github.com/g-alex/pytest-playwright-ecommerce/actions/workflows/smoke.yml/badge.svg)](https://github.com/g-alex/pytest-playwright-ecommerce/actions/workflows/smoke.yml)
 
 Black-box **API** and **UI** autotests for a Telegram Mini App e-commerce product.
 
