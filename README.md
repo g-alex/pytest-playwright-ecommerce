@@ -2,7 +2,7 @@
 
 Black-box **API** and **UI** autotests for a Telegram Mini App e-commerce product.
 
-Application source code is **private (NDA)**. This repository contains **tests only** — no shop brand, no production URLs.
+Application source code is **private**. This repository contains **tests only** — no production URLs.
 
 ## Stack
 
@@ -12,7 +12,7 @@ Application source code is **private (NDA)**. This repository contains **tests o
 - Playwright + Page Object Model (UI)
 - jsonschema (API contract checks)
 - Allure / pytest-html (reports)
-- GitHub Actions (collect + optional smoke)
+- GitHub Actions (`pytest --collect-only` on push; optional API smoke when `BASE_URL` is set)
 
 ## Test approach
 
@@ -122,9 +122,11 @@ allure serve allure-results
 
 ## CI (GitHub Actions)
 
-On every push/PR the workflow runs `pytest --collect-only` (framework sanity).
+On every push/PR the workflow runs **`pytest --collect-only`** (imports, discovery, framework sanity).
 
-Optional job **API smoke** runs only when repository variable `BASE_URL` is set (local/staging stand or future private-app clone). HTML/Allure outputs are uploaded as artifacts — not committed to git.
+Full **API smoke** is optional and runs only when repository variable `BASE_URL` points to a safe local/staging stand (or a future CI-started app). Until then, suite execution is local/staging — not claimed as a full test run on every Actions build.
+
+When smoke is enabled, HTML/Allure outputs are uploaded as artifacts (not committed).
 
 ## Reports
 
@@ -135,14 +137,10 @@ Smoke tests use Allure metadata (`feature` / `story` / `title` / `step`).
 | pytest-html | `--html=reports/report.html --self-contained-html` | No (gitignore) |
 | Allure | `--alluredir=allure-results` + `allure serve` | No (gitignore) |
 
-Keep reports local or as **CI artifacts**. Do not push raw results.
+Keep reports local or as CI artifacts when smoke is enabled. Do not push raw results.
 
 ## Safety
 
-- Do **not** commit `.env`, tokens, production URLs, or shop brand assets.
+- Do **not** commit `.env`, tokens, or production URLs.
 - Mutating flows (create order) — **local/staging only**.
 - Tests use a dedicated `TEST_USER_ID`.
-
-## Resume one-liner
-
-> API + UI autotests for a Telegram Mini App e-commerce product (NDA): pytest, Playwright, Page Object, jsonschema, Allure/HTML. Public tests-only repo; risk-based smoke + negatives; isolated stand; anti-flaky waits and shared test user id.
