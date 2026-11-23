@@ -13,8 +13,9 @@ Application source code is **private**. This repository contains **tests only** 
 - Playwright + Page Object Model (UI)
 - jsonschema (API contract checks)
 - Allure / pytest-html (reports)
-- GitHub Actions (`pytest --collect-only` on push; optional API smoke when `BASE_URL` is set)
+- GitHub Actions: lint/`collect-only`, then API + UI on an ephemeral Docker stand from the private app repo
 - pytest-rerunfailures (UI only; not in default addopts)
+- Allure report on [GitHub Pages](https://g-alex.github.io/pytest-playwright-ecommerce/) (after push to `main`)
 
 ## Test approach
 
@@ -133,11 +134,13 @@ allure serve allure-results
 
 ## CI (GitHub Actions)
 
-On every push/PR the workflow runs **`pytest --collect-only`** (imports, discovery, framework sanity).
+Workflow file: `.github/workflows/smoke.yml` (`name: CI`).
 
-Full **API smoke** is optional and runs only when repository variable `BASE_URL` points to a safe local/staging stand (or a future CI-started app). Until then, suite execution is local/staging — not claimed as a full test run on every Actions build.
+1. **`lint-collect`** — `pytest --collect-only` (framework sanity).
+2. **`e2e`** — clones private app with read-only deploy key → `docker compose -f app/docker-compose.test.yml up` → waits for `/api/status` → runs API then UI (`--tracing off`, UI `--reruns 1`).
+3. **`pages`** (push to `main` only) — publishes Allure HTML to GitHub Pages.
 
-When smoke is enabled, HTML/Allure outputs are uploaded as artifacts (not committed).
+Fork PRs skip `e2e` (no access to `APP_DEPLOY_KEY`). Secrets are never echoed; `app/` and `docker compose logs` are not uploaded. Failure screenshots only (`retention-days: 7`); traces stay local.
 
 ## Reports
 
@@ -146,13 +149,13 @@ Smoke tests use Allure metadata (`feature` / `story` / `title` / `step`).
 | Report | Command | Commit to git? |
 |--------|---------|----------------|
 | pytest-html | `--html=reports/report.html --self-contained-html` | No (gitignore) |
-| Allure | `--alluredir=allure-results` + `allure serve` | No (gitignore) |
-| Playwright | screenshot + trace on failure → `test-results/` | No (gitignore) |
+| Allure | `--alluredir=allure-results` + `allure serve` / CI → Pages | No (gitignore) |
+| Playwright | screenshot + trace on failure → `test-results/` (CI: screenshots only) | No (gitignore) |
 
-Keep reports local or as CI artifacts when smoke is enabled. Do not push raw results.
+Keep reports local or as CI artifacts. Do not push raw results.
 
 ## Safety
 
 - Do **not** commit `.env`, tokens, or production URLs.
-- Mutating flows (create order) — **local/staging only**.
+- Mutating flows — **local / Docker test stand / CI stand only**, never production.
 - Tests use a dedicated `TEST_USER_ID`.

@@ -1,4 +1,4 @@
-name: smoke
+name: CI
 
 on:
   push:
@@ -24,38 +24,61 @@ jobs:
       - name: Collect tests (framework sanity)
         run: python -m pytest --collect-only -q
 
-  smoke-api:
-    runs-on: ubuntu-latest
+  e2e:
     needs: lint-collect
-    if: ${{ vars.BASE_URL != '' }}
+    runs-on: ubuntu-latest
+    # Fork PRs do not get secrets — skip instead of failing checkout.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      BASE_URL: http://localhost:3000
+      TEST_USER_ID: web_tg_aqa_ci_user
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout tests
+        uses: actions/checkout@v4
+
+      - name: Checkout private app (read-only deploy key)
+        uses: actions/checkout@v4
+        with:
+          repository: g-alex/miniapp-shop
+          ssh-key: ${{ secrets.APP_DEPLOY_KEY }}
+          path: app
+
+      - name: Start app stand
+        run: |
+          docker compose -f app/docker-compose.test.yml up -d --build
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/status; then
+              echo
+              echo "App is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App did not become healthy in time"
+          exit 1
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run API smoke
-        env:
-          BASE_URL: ${{ vars.BASE_URL }}
-          TEST_USER_ID: web_tg_aqa_ci_user
-        run: |
-          python -m pytest -m "smoke and api" -v \
-            --html=reports/report.html --self-contained-html \
-            --alluredir=allure-results
+      - name: API tests
+        run: python -m pytest -m api -v --alluredir=allure-results
 
-      - name: Upload HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-html-report
-          path: reports/report.html
-          if-no-files-found: ignore
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: UI tests
+        run: >
+          python -m pytest -m ui -v
+          --browser chromium
+          --reruns 1
+          --tracing off
+          --alluredir=allure-results
 
       - name: Upload Allure results
         if: always()
@@ -64,3 +87,52 @@ jobs:
           name: allure-results
           path: allure-results
           if-no-files-found: ignore
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-failure-screenshots
+          path: test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+  pages:
+    name: Allure GitHub Pages
+    needs: e2e
+    if: >
+      always()
+      && needs.e2e.result != 'skipped'
+      && github.event_name == 'push'
+      && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download Allure results
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results
+          path: allure-results
+
+      - name: Setup Allure CLI
+        run: |
+          curl -fsSL https://github.com/allure-framework/allure2/releases/download/2.32.0/allure-2.32.0.tgz \
+            | tar -xz
+          echo "$PWD/allure-2.32.0/bin" >> "$GITHUB_PATH"
+
+      - name: Generate Allure report
+        run: allure generate allure-results -o allure-report --clean
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: allure-report
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
