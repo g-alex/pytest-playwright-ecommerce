@@ -13,6 +13,7 @@ Application source code is **private**. This repository contains **tests only** 
 - jsonschema (API contract checks)
 - Allure / pytest-html (reports)
 - GitHub Actions (`pytest --collect-only` on push; optional API smoke when `BASE_URL` is set)
+- pytest-rerunfailures (UI only; not in default addopts)
 
 ## Test approach
 
@@ -44,16 +45,18 @@ We do **not** duplicate every API check in UI. UI covers what the user sees; API
 
 ### Anti-flaky strategy
 
-- Fresh **browser context** per UI test (no shared cookies/`localStorage` leaks).
-- Shared **`TEST_USER_ID`**: UI seeds `localStorage.browserTempUserId`; API `clear_cart` uses the same id.
+- Fresh **browser context** per UI test via pytest-playwright (no shared cookies/`localStorage` leaks).
+- Shared **`TEST_USER_ID`**: `context` fixture seeds `localStorage.browserTempUserId`; API `clear_cart` uses the same id.
 - Prefer Playwright **`expect` / `expect_response`** over fixed `sleep`.
 - Dynamic test data from the stand (no hard-coded product ids/titles).
 - Use **`available_stock`** (stock minus reserved), not raw `stock` alone.
+- Screenshot and Playwright **trace** retained on failure (`test-results/`, not committed). No video.
+- Single **rerun for UI only** (`pytest -m ui --reruns 1`); API runs without reruns so real bugs are not masked.
 - Mutating tests only on **local/staging**, never production.
 
 ### UI ↔ API user sync
 
-1. `page` fixture seeds `localStorage.browserTempUserId = TEST_USER_ID`.
+1. `context` fixture seeds `localStorage.browserTempUserId = TEST_USER_ID`.
 2. `TEST_USER_ID` must look like `web_tg_<username>` (see `.env.example`).
 3. UI checkout form regenerates the same id from the Telegram field → cart/order stay aligned.
 
@@ -108,9 +111,16 @@ python -m pytest -v
 # smoke only
 python -m pytest -m smoke -v
 
-# API only / UI only
+# API only / UI only (UI: one rerun for flaky network/UI)
 python -m pytest -m api -v
-python -m pytest -m ui -v
+python -m pytest -m ui --reruns 1 -v
+
+# headed / other browser (pytest-playwright CLI)
+python -m pytest -m ui --headed --slowmo 300
+python -m pytest -m ui --browser firefox
+
+# open failure trace
+playwright show-trace test-results/<test>/trace.zip
 
 # HTML report
 python -m pytest -m smoke --html=reports/report.html --self-contained-html
@@ -136,6 +146,7 @@ Smoke tests use Allure metadata (`feature` / `story` / `title` / `step`).
 |--------|---------|----------------|
 | pytest-html | `--html=reports/report.html --self-contained-html` | No (gitignore) |
 | Allure | `--alluredir=allure-results` + `allure serve` | No (gitignore) |
+| Playwright | screenshot + trace on failure → `test-results/` | No (gitignore) |
 
 Keep reports local or as CI artifacts when smoke is enabled. Do not push raw results.
 

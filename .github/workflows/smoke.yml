@@ -44,7 +44,6 @@ jobs:
         env:
           BASE_URL: ${{ vars.BASE_URL }}
           TEST_USER_ID: web_tg_aqa_ci_user
-          HEADLESS: "true"
         run: |
           python -m pytest -m "smoke and api" -v \
             --html=reports/report.html --self-contained-html \

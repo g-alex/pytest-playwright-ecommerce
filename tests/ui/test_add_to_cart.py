@@ -14,7 +14,7 @@ from pages.product_modal import ProductModal
 @pytest.mark.ui
 @pytest.mark.smoke
 def test_add_product_to_cart_updates_badge(page, test_user_id, clear_cart):
-    # page fixture seeds localStorage.browserTempUserId = TEST_USER_ID
+    # context fixture seeds localStorage.browserTempUserId = TEST_USER_ID
     # clear_cart clears the same user on API side
     catalog = CatalogPage(page)
     modal = ProductModal(page)

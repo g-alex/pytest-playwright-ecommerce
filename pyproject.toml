@@ -12,6 +12,7 @@ dependencies = [
     "jsonschema>=4.20",
     "allure-pytest>=2.13",
     "pytest-html>=4.1",
+    "pytest-rerunfailures>=14.0",
 ]
 
 [project.optional-dependencies]
@@ -26,7 +27,7 @@ markers = [
     "smoke: critical smoke suite",
     "negative: negative / validation cases",
 ]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers --screenshot only-on-failure --tracing retain-on-failure"
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.ruff]

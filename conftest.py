@@ -1,11 +1,13 @@
-"""Shared pytest fixtures: settings, API client, Playwright page."""
+"""Shared pytest fixtures: settings, API client, Playwright context seed."""
 
 from __future__ import annotations
+
+import json
 
 import allure
 import httpx
 import pytest
-from playwright.sync_api import Browser, Page, Playwright, sync_playwright
+from playwright.sync_api import BrowserContext
 
 from utils.config import Settings, get_settings
 
@@ -45,34 +47,23 @@ def clear_cart(api_client: httpx.Client, test_user_id: str):
 
 
 @pytest.fixture(scope="session")
-def playwright_instance():
-    with sync_playwright() as playwright:
-        yield playwright
-
-
-@pytest.fixture(scope="session")
-def browser(playwright_instance: Playwright, settings: Settings) -> Browser:
-    launcher = getattr(playwright_instance, settings.browser)
-    browser = launcher.launch(headless=settings.headless)
-    yield browser
-    browser.close()
+def browser_context_args(browser_context_args: dict, settings: Settings) -> dict:
+    """Mini App viewport + stand base_url, so goto('/') works."""
+    return {
+        **browser_context_args,
+        "base_url": settings.base_url,
+        "viewport": {"width": 390, "height": 844},
+        "locale": "ru-RU",
+    }
 
 
 @pytest.fixture
-def page(browser: Browser, settings: Settings, test_user_id: str) -> Page:
-    """Fresh browser context; seed the same user id as API tests.
+def context(context: BrowserContext, test_user_id: str) -> BrowserContext:
+    """Plugin context + same user id as API clear_cart.
 
-    Mini App browser mode reads localStorage.browserTempUserId.
-    Seeding it keeps UI cart and API clear_cart on one user.
+    Not autouse: API tests must not start a browser.
     """
-    context = browser.new_context(
-        viewport={"width": 390, "height": 844},
-        locale="ru-RU",
-        base_url=settings.base_url,
-    )
     context.add_init_script(
-        f"localStorage.setItem('browserTempUserId', {test_user_id!r});"
+        f"localStorage.setItem('browserTempUserId', {json.dumps(test_user_id)});"
     )
-    page = context.new_page()
-    yield page
-    context.close()
+    return context
