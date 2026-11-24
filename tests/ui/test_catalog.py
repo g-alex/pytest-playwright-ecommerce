@@ -20,3 +20,5 @@ def test_catalog_shows_products(page):
 
     with allure.step("Assert products are visible"):
         assert catalog.products_count() >= 1
+
+    assert False  # temporary: verify ui-failure-screenshots artifact

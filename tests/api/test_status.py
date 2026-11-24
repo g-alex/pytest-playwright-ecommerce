@@ -18,3 +18,5 @@ def test_api_status_ok(api_client):
         body = response.json()
         assert body.get("status") == "ok"
         assert "timestamp" in body
+
+    assert False  # temporary: verify CI still runs UI after API fail
