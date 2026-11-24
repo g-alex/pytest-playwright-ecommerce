@@ -70,9 +70,12 @@ jobs:
         run: python -m pytest -m api -v --alluredir=allure-results
 
       - name: Install Playwright Chromium
+        if: ${{ !cancelled() }}
         run: python -m playwright install --with-deps chromium
 
+      # Still run UI if API failed, so Allure has both layers (skip only on cancel).
       - name: UI tests
+        if: ${{ !cancelled() }}
         run: >
           python -m pytest -m ui -v
           --browser chromium
@@ -105,6 +108,9 @@ jobs:
       && needs.e2e.result != 'skipped'
       && github.event_name == 'push'
       && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       pages: write
